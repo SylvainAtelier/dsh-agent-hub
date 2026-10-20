@@ -1,0 +1,8 @@
+node_modules/
+lib/
+*.tgz
+.native-build/
+native/dsh-type/target/
+*-tests.log
+*-types.log
+.device-sim.json

@@ -1,0 +1,6 @@
+# One row mounts both halves of the hub: the host side (agent-hub/* RPC
+# routes; today the usage module's quota probes) and the browser side
+# (settings section + sidebar glance card, served from lib/client.js).
+- insert:
+    - id: agent-hub
+      name: 'dsh-agent-hub'
