@@ -127,6 +127,7 @@ import { READER_METHOD } from './reader/types.ts'
 import { CANVAS_METHOD, type CanvasRequest } from './canvas/types.ts'
 import type { WorktreeList, WorktreeOpened } from './git/types.ts'
 import { appendedPrompt, instructionsText, withInstructions, withSection } from './prompt.ts'
+import { Archify } from './archify.ts'
 import { blockedReason } from './guard.ts'
 import { ConfigSync, type PluginManager, type ProfileLocation } from './sync/index.ts'
 import type { CollectionStore } from './sync/collection.ts'
@@ -796,6 +797,14 @@ export function apply(ctx: HostContext, config: Config): void {
     sessions: join(dshHome(), 'sessions'),
     archived: (sessionId) => (ctx.get('workspaceRegistry') as { archivedSessionIds?: readonly string[] } | undefined)?.archivedSessionIds?.includes(sessionId) === true,
   })
+  // Archify: installed while its switch (and the canvases') is on; the prompt names its folder once ready.
+  const archify = new Archify(join(dshHome(), 'dsh-agent-hub', 'archify'), { log: warn('archify') })
+  const archifyOn = (): boolean => config.prompt.get().canvas !== false && config.prompt.get().archify === true
+  ctx.effect(() => {
+    const follow = (): void => { if (archifyOn()) void archify.ensure() }
+    follow()
+    return onSection('prompt', follow)
+  }, 'dsh-agent-hub: archify')
   // The board: Linear tickets and local tasks.
   const board = new BoardService({
     repos: () => repoIndex.list(),
@@ -1182,11 +1191,12 @@ export function apply(ctx: HostContext, config: Config): void {
   const turnHost = (name: string) => ({
     instructions: (sessionId: string) => {
       primeGuard(sessionId)
-      return appendedPrompt(instructionsText(config.prompt.get(), canvases.dir), [review.section(sessionId), alerts.section(sessionId)].filter(Boolean).join('\n\n') || undefined)
+      return appendedPrompt(instructionsText(config.prompt.get(), canvases.dir, archify.dir), [review.section(sessionId), alerts.section(sessionId)].filter(Boolean).join('\n\n') || undefined)
     },
     blocked: (command: unknown, sessionId: string) => blocked(command, sessionId),
     trusted: (tool: string, input: Record<string, unknown>, sessionId: string, cwd?: string) => trusted(tool, input, sessionId, cwd),
     references: canvases,
+    directories: () => (archify.dir === undefined ? [] : [archify.dir]),
     async *delegate<T extends { provider: string; model: string }>(options: T): AsyncIterable<object> {
       const route = await helperFor(config.claude.get())
       const llm = meteredLlm()
@@ -1416,7 +1426,7 @@ export function apply(ctx: HostContext, config: Config): void {
     }
     primeGuard(sessionId)
     const guarded = [review.section(sessionId), alerts.section(sessionId)].filter(Boolean).join('\n\n') || undefined
-    const assembly = withSection(withInstructions(await next(), instructionsText(config.prompt.get(), canvases.dir)), REVIEW_SECTION, guarded)
+    const assembly = withSection(withInstructions(await next(), instructionsText(config.prompt.get(), canvases.dir, archify.dir)), REVIEW_SECTION, guarded)
     return taskSession ? { ...assembly, tools: assembly.tools.filter((tool) => tool.name === 'automation_run') } : assembly
   }, { prepend: true }), 'dsh-agent-hub: global instructions'))
 
@@ -1614,12 +1624,16 @@ export function apply(ctx: HostContext, config: Config): void {
     // Which optional modules are on, read by every browser (a phone's too) to show their panels; and the Codex plugin.
     [MODULES_METHOD]: [async (payload) => {
       const request = payload as ModulesRequest
+      if (request.op === 'archify') {
+        await archify.ensure()
+        return { modules: config.modules.get(), codex: await codexPlugin(bundles()), archify: archify.status(archifyOn()) }
+      }
       if (request.op === 'codex') {
         const result = await setUpCodex(bundles(), request.action)
         hub.invalidate('codex')
         return result
       }
-      return { modules: config.modules.get(), codex: await codexPlugin(bundles()) }
+      return { modules: config.modules.get(), codex: await codexPlugin(bundles()), archify: archify.status(archifyOn()) }
     }, 'Modules request failed'],
     // The sidebar's restart button: DSH Desktop only, with what the restart would interrupt.
     [RESTART_METHOD]: [createRestart({ agents: () => ctx.get('agents') as ReturnType<TaskSources['agents']>, jobs: () => ctx.get('jobs') as ReturnType<TaskSources['jobs']> }, undefined, undefined, restartUpgrades), 'Restart failed'],

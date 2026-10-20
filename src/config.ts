@@ -143,8 +143,8 @@ export const Config: z<Config> = z.object({
       .description('Global instructions in Markdown, given to every conversation with every model (Claude Agent and bots included) at the end of its system prompt.'),
     canvas: z.boolean().default(true)
       .description('Teach every model to deliver standalone charts, tables and dashboards as self-contained interactive HTML files in ~/.dsh/canvases, linked in its reply and browsed together in the 画布 panel.'),
-    archify: z.boolean().default(true)
-      .description('With canvases on, have the models draw architecture, workflow, sequence, data-flow, state, ERD, class, tree, timeline and waterfall diagrams with the Archify skill (github.com/tt-a1i/archify) when they have it installed, delivered as canvases. Slower and costlier than a hand-written canvas, and needs Node and a local Chrome or Edge.'),
+    archify: z.boolean().default(false)
+      .description('With canvases on, install the Archify skill (github.com/tt-a1i/archify, a pinned release checked by its SHA-256) and have every model draw architecture, workflow, sequence, data-flow, state, ERD, class, tree, timeline and waterfall diagrams with it, delivered as canvases. Slower and costlier than a hand-written canvas, and needs Node and a local Chrome or Edge.'),
     blockedScans: z.array(z.union(SCAN_RULES)).default([...SCAN_RULES])
       .description('Whole-filesystem find scans refused before they run, for every model: root = find /, mount = find /c, drive = find C:/, proc = find /proc.'),
     blockedCommands: z.array(z.string()).default([])

@@ -191,7 +191,8 @@ test('review lane: a sent review followed up rises with what came, until marked 
     assert.deepEqual(first.items[0]!.follow?.mine, { replied: 1, resolved: 0, outdated: 0, open: 0 })
 
     const after = (await service.handle({ op: 'seen', key: 'acme/app#7' }) as { ok: true; value: { items: Array<{ number: number; follow?: { commits: number; comments: number } }> } }).value
-    assert.deepEqual(after.items.map((item) => [item.number, item.follow?.commits, item.follow?.comments]), [[7, 0, 0], [8, 0, 0]])
+    // Both seen, so tied: the newer one first.
+    assert.deepEqual(after.items.map((item) => [item.number, item.follow?.commits, item.follow?.comments]), [[8, 0, 0], [7, 0, 0]])
     const kept = (parseSheet(readFileSync(path, 'utf8')) as { sheet: Sheet }).sheet
     assert.deepEqual([kept.read, kept.seen, kept.status], [new Date(NOW).toISOString(), B, 'submitted'])
     service.dispose()

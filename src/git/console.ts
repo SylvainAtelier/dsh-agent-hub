@@ -247,6 +247,8 @@ export class ConsoleService {
     const child = spawn(sh.file, sh.args(command), {
       cwd: root,
       windowsHide: true,
+      // Leads its own process group, so an interrupt reaches the command too, not just the shell (killTree).
+      detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,

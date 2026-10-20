@@ -1,6 +1,10 @@
 // Publish a snapshot of a private development branch to the public repository as one commit.
 //
-//   node scripts/publish.mjs [-m "message"] [--dry-run]
+//   node scripts/publish.mjs [-m "message"] [--release] [--dry-run]
+//
+// --release also tags the published snapshot v<package.json version> on the public remote only; that
+// tag is what the public repository's release workflow (.github/workflows/release.yml) builds and
+// publishes. The tag is never made in this clone, so the private remote never receives it.
 //
 // The public history is a line of snapshots: each run commits the branch's current tree on top
 // of the public branch, authored as the public identity at the moment of publishing, and pushes
@@ -22,6 +26,7 @@ import { join } from 'node:path'
 
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
+const release = args.includes('--release')
 const messageAt = args.findIndex((arg) => arg === '-m' || arg === '--message')
 const message = messageAt === -1 ? undefined : args[messageAt + 1]
 
@@ -42,7 +47,8 @@ const tree = git(['rev-parse', `${source}^{tree}`])
 const published = git(['ls-remote', '--heads', remote, 'main']) !== ''
 if (published) git(['fetch', '--quiet', remote, `+refs/heads/main:refs/remotes/${remote}/main`], { stdio: ['pipe', 'pipe', 'inherit'] })
 const parent = published ? git(['rev-parse', '--verify', `refs/remotes/${remote}/main^{commit}`]) : ''
-if (parent !== '' && git(['rev-parse', `${parent}^{tree}`]) === tree) {
+const unchanged = parent !== '' && git(['rev-parse', `${parent}^{tree}`]) === tree
+if (unchanged && !release) {
   console.log(`publish: ${remote}/main already has ${branch}'s tree; nothing to publish`)
   process.exit(0)
 }
@@ -57,15 +63,23 @@ else {
 }
 
 const version = JSON.parse(git(['show', `${source}:package.json`])).version
+const tag = `v${version}`
+// A version is released once: bump package.json on the private branch for the next one.
+if (release && git(['ls-remote', '--tags', remote, `refs/tags/${tag}`]) !== '') fail(`${remote} already has ${tag}; bump the version in package.json first`)
 const subject = message ?? `dsh-agent-hub ${version}`
-const changed = parent === '' ? 'first publish' : tryGit(['diff', '--shortstat', parent, tree])
-console.log(`publish: ${branch} (${source.slice(0, 7)}) → ${remote}/main as "${subject}", by ${name} <${email}>; ${changed}`)
+const changed = parent === '' ? 'first publish' : unchanged ? 'no changes' : tryGit(['diff', '--shortstat', parent, tree])
+console.log(`publish: ${branch} (${source.slice(0, 7)}) → ${remote}/main as "${subject}", by ${name} <${email}>; ${changed}${release ? `; release ${tag}` : ''}`)
 if (dryRun) process.exit(0)
 
-// Dated now, as git does by itself: the moment of publishing, not of any private commit.
-const env = { ...process.env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email }
-const commit = git(['commit-tree', tree, ...(parent === '' ? [] : ['-p', parent]), '-m', subject], { env })
-git(['push', remote, `${commit}:refs/heads/main`], { stdio: ['pipe', 'inherit', 'inherit'] })
-git(['update-ref', `refs/published/${branch}`, source])
-git(['update-ref', `refs/remotes/${remote}/main`, commit])
-console.log(`publish: done, ${remote}/main is ${commit.slice(0, 7)}`)
+let commit = parent
+if (!unchanged) {
+  // Dated now, as git does by itself: the moment of publishing, not of any private commit.
+  const env = { ...process.env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email }
+  commit = git(['commit-tree', tree, ...(parent === '' ? [] : ['-p', parent]), '-m', subject], { env })
+  git(['push', remote, `${commit}:refs/heads/main`], { stdio: ['pipe', 'inherit', 'inherit'] })
+  git(['update-ref', `refs/published/${branch}`, source])
+  git(['update-ref', `refs/remotes/${remote}/main`, commit])
+}
+// Straight to the public remote: no local tag, so a `git push --tags` to the private one cannot carry it.
+if (release) git(['push', remote, `${commit}:refs/tags/${tag}`], { stdio: ['pipe', 'inherit', 'inherit'] })
+console.log(`publish: done, ${remote}/main is ${commit.slice(0, 7)}${release ? `; ${tag} pushed, the release workflow takes it from here` : ''}`)

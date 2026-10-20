@@ -1,0 +1,181 @@
+# Release: a v<version> tag on the public repository builds the plugin with its native helper for
+# macOS and Windows, publishes it to npm and creates the GitHub release with the same package.
+#
+# The tag comes from `npm run release:public` in the private repository (scripts/publish.mjs), which
+# pushes it to the public remote only. The private repository carries this file too, so every job is
+# fenced to the public one: a tag there never releases anything.
+#
+# npm authentication: trusted publishing (OIDC) once it is set up for this workflow on npmjs.com;
+# until then, for the first release, an NPM_TOKEN repository secret.
+# Optional macOS signing: MACOS_CERTIFICATE (base64 .p12 of a Developer ID Application certificate)
+# and MACOS_CERTIFICATE_PASSWORD; without them the helper is signed ad hoc.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'SylvainAtelier/dsh-agent-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag matches package.json, on main
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Test
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
+          pnpm test
+
+  native:
+    needs: verify
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: macos-14, target: aarch64-apple-darwin, platform: darwin-arm64 }
+          - { os: macos-14, target: x86_64-apple-darwin, platform: darwin-x64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, platform: win32-x64 }
+          - { os: windows-latest, target: aarch64-pc-windows-msvc, platform: win32-arm64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/dsh-type
+          key: ${{ matrix.target }}
+      - name: Signing identity (optional)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then echo "No certificate: the helper is signed ad hoc"; exit 0; fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          secret=$(openssl rand -hex 16)
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$secret" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$secret" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$secret" "$keychain" >/dev/null
+          # shellcheck disable=SC2046 # the existing search list, one keychain per word
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$keychain" | grep -m1 'Developer ID Application' | awk '{print $2}')
+          echo "DSH_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          rm "$RUNNER_TEMP/certificate.p12"
+      - name: Build the helper
+        run: node scripts/build-native.mjs ${{ matrix.target }}
+      # A tar keeps the executable bit, which artifacts drop.
+      - name: Pack
+        shell: bash
+        run: tar -cf native-${{ matrix.platform }}.tar -C lib/bin ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: native-${{ matrix.platform }}.tar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [verify, native]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+    permissions:
+      contents: write   # the GitHub release
+      id-token: write   # npm trusted publishing and provenance
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+          merge-multiple: true
+      - name: Unpack the helpers
+        run: |
+          mkdir -p lib/bin
+          for archive in native/*.tar; do tar -xf "$archive" -C lib/bin; done
+      - run: pnpm build
+      - name: Pack and check its contents
+        run: |
+          tarball=$(npm pack --silent | tail -n1)
+          listing=$(tar -tzf "$tarball")
+          for file in lib/index.js lib/client.js lib/palette.html lib/bin/qoder-daily-credit.mjs cordis.patch.yml LICENSE README.md \
+            lib/bin/darwin-arm64/dsh-type lib/bin/darwin-x64/dsh-type lib/bin/win32-x64/dsh-type.exe lib/bin/win32-arm64/dsh-type.exe; do
+            echo "$listing" | grep -qx "package/$file" || { echo "::error::$file missing from $tarball"; exit 1; }
+          done
+          tar -tvzf "$tarball" package/lib/bin/darwin-arm64/dsh-type | grep -q '^-rwx' || { echo "::error::the macOS helper lost its executable bit"; exit 1; }
+          sha256sum "$tarball" > SHA256SUMS
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          name=$(node -p "require('./package.json').name")
+          # A rerun after a later step failed: the version is out already.
+          if npm view "$name@$VERSION" version >/dev/null 2>&1; then echo "$name@$VERSION is already on npm"; exit 0; fi
+          npm install -g npm@latest >/dev/null
+          tag=latest; [ "$PRERELEASE" = true ] && tag=next
+          npm publish "$TARBALL" --access public --provenance --tag "$tag"
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$TARBALL" SHA256SUMS --clobber
+          else
+            flags=(--verify-tag --generate-notes --title "$GITHUB_REF_NAME")
+            [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+            gh release create "$GITHUB_REF_NAME" "$TARBALL" SHA256SUMS "${flags[@]}"
+          fi

@@ -35,7 +35,7 @@ DeepSeek Harness 插件：把多个不同的 agent（Claude、Codex、MiniMax…
 | | Codex | 开 | Codex 模型设置与订阅用量里的 Codex 卡片；需要另装 `dsh-codex-subscription` 插件；随配置同步 |
 | 对话 | 全局指令（Markdown） | 空 | 每次与任何模型对话时注入：DSH 模型放在系统提示词末尾，Claude Agent 追加到 Claude Code 的系统提示词，bot 在其人设之后也会收到；留空不注入。Claude Agent 会话在下一轮以新进程恢复以应用改动 |
 | | 画布 | 开 | 让所有模型把独立的图表、表格、仪表盘做成可交互、自包含的 HTML 文件，存到 `~/.dsh/canvases`，在回复里给出链接，并可在左侧「画布」面板集中浏览 |
-| | Archify 结构图 | 开 | 开启画布时，让模型用 [Archify](https://github.com/tt-a1i/archify) skill 画架构、流程、时序、数据流、状态、ERD 等图，仍存为画布。需自行把 Archify 装进各模型的 skill 目录，并有 Node 和本机 Chrome 或 Edge；比手写画布更慢、更耗 token |
+| | Archify 结构图 | 关 | 开启画布时，打开后自动下载固定版本的 [Archify](https://github.com/tt-a1i/archify)（校验 SHA-256，装到 `~/.dsh/dsh-agent-hub/archify/<版本>`），所有模型都用它画架构、流程、时序、数据流、状态、ERD 等图，仍存为画布；设置里显示安装状态，失败可重试，装好之前照常手写。需要 Node 和本机 Chrome 或 Edge；比手写画布更慢、更耗 token |
 | | 选区讨论 | 开 | 选中聊天正文或代码块后显示“问一下”；临时讨论不运行工具、不读取完整主会话 |
 | | 讨论模型 | 自动 | 复用后台辅助模型路由，或指定普通文本模型；不支持 Claude Agent、Cursor 和 Bots，修改只影响新讨论 |
 | 连接器 | 已连接的服务 | 空 | 远程 MCP 服务器（Linear、Notion、Sentry、GitHub 或任意地址），连接一次所有模型可用；详见[模块：连接器](#模块连接器) |
@@ -90,7 +90,7 @@ DeepSeek Harness 插件：把多个不同的 agent（Claude、Codex、MiniMax…
         ## 沟通
         - 用中文回答，代码和标识符保留英文
       canvas: true                  # 画布：图表、表格、仪表盘做成 ~/.dsh/canvases 里的 HTML
-      archify: true                 # 用 Archify skill 画结构图（需开启画布）
+      archify: false                # 自动安装 Archify 并用它画结构图（需开启画布）
     connectors:
       servers:                      # 只有 id 和地址；登录凭据在 DSH 凭据库
         - id: linear
@@ -630,12 +630,26 @@ src/client/restart/     左侧栏底部的重启按钮、确认框与重启中�
 
 ## 安装
 
+在 DSH 侧栏打开 **插件 → 安装**，输入 `@sylvainatelier/dsh-agent-hub`。也可以用命令行（DSH 桌面版的 profile 是 `desktop`）：
+
 ```sh
-pnpm install && pnpm build
+dsh plugin --profile desktop add @sylvainatelier/dsh-agent-hub
+```
+
+按提示重启 DSH，然后在 **设置 → Agent Hub → 功能模块** 打开需要的模块。新版本会出现在 **设置 → 同步与更新**。每个 [GitHub Release](https://github.com/SylvainAtelier/dsh-agent-hub/releases) 附带同一个 `.tgz` 包及其 SHA-256，可离线安装（`dsh plugin --profile desktop add ./sylvainatelier-dsh-agent-hub-<版本>.tgz`）。
+
+包内附带 macOS（Apple 芯片与 Intel）和 Windows（x64 与 ARM64）的原生助手 `dsh-type`，剪贴板浮窗和 Cardputer 听写依赖它。macOS 上首次使用会请求一次辅助功能权限，以便向其他应用输入文字。
+
+从源码安装（需要 Node 22.19+ 和 pnpm；`pnpm build:native` 需要 Rust，且只编译本机平台的助手）：
+
+```sh
+pnpm install && pnpm build && pnpm build:native
 dsh plugin --profile desktop add link:<本仓库路径>
 ```
 
-装好后重启 DSH，打开 **设置 → 订阅用量**。
+## 发布
+
+发布由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 完成，且只在公开仓库运行：推送 `v<版本号>` 标签后，依次做类型检查与测试，在 macOS 和 Windows 上编译原生助手，带来源证明（provenance）发布到 npm，并用同一个 `.tgz` 创建 GitHub Release。带预发布后缀的版本（如 `0.2.0-beta.1`）发布到 npm 的 `next` 标签，并标为预发布。发布时先改 `package.json` 的 `version`，再向公开仓库推送 `v<版本号>` 标签；从私有仓库维护时用 `npm run release:public`（[`scripts/publish.mjs`](scripts/publish.mjs)），它推送快照，并只向公开远端推送标签。
 
 ## 开发
 

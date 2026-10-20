@@ -25,7 +25,7 @@ export interface PluginUpdateOptions {
   pending?: PendingOps;
 }
 /** This plugin: installed last, so nothing it runs is replaced while the batch still needs it. */
-const SELF = "dsh-agent-hub";
+const SELF = "@sylvainatelier/dsh-agent-hub";
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 export class PluginUpdates {

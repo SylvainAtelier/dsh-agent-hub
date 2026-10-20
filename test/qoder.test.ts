@@ -17,7 +17,7 @@ import { DaemonLog, daemonName, lineReader, RemoteWorkspaces, toolOf } from '../
 import { HOOK_SCRIPT, prepareWorkspace, withHooks } from '../src/qoder/worktree.ts'
 import { exec } from '../src/exec.ts'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 
 test('qoder: a model\'s credit rate follows its name', () => {
   assert.equal(creditRate('Reasoning · Vision · 0.50x Credit'), '0.5×')
@@ -149,7 +149,8 @@ test('qoder worktrees: our hooks replace an earlier copy of themselves and keep 
 })
 
 async function repository(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), 'qoder-trees-'))
+  // Its real path: git reports /private/var/… for macOS's /var/… temp folder.
+  const repo = realpathSync(await mkdtemp(join(tmpdir(), 'qoder-trees-')))
   const git = (...args: string[]) => exec('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo, timeoutMs: 20_000 })
   await git('init', '-q', '-b', 'main')
   writeFileSync(join(repo, 'a.txt'), 'a\n')

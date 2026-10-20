@@ -242,7 +242,8 @@ test('TLS link close releases TCP peers stalled before ClientHello and is idempo
   socket.on('error', () => {})
   t.after(() => socket.destroy())
   await once(socket, 'connect')
-  const closed = once(socket, 'close')
+  // Not `once`: it rejects on the reset macOS delivers ahead of the close, and either way the peer is released.
+  const closed = new Promise((resolve) => socket.once('close', resolve))
   const first = link.close()
   assert.equal(link.close(), first)
   await first

@@ -10,7 +10,7 @@ test('config: an empty entry yields live sections with defaults', () => {
   assert.deepEqual(config.remote.get(), { httpsPort: 443, http: true, phoneSettings: false })
   assert.deepEqual(config.git.get(), { identities: [], strict: true })
   assert.deepEqual(config.team.get(), { agents: [] })
-  assert.deepEqual(config.prompt.get(), { canvas: true, archify: true, blockedScans: ['root', 'mount', 'drive', 'proc'], blockedCommands: [] })
+  assert.deepEqual(config.prompt.get(), { canvas: true, archify: false, blockedScans: ['root', 'mount', 'drive', 'proc'], blockedCommands: [] })
 })
 
 test('config: global instructions keep their Markdown as written', () => {

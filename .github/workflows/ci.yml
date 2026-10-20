@@ -1,0 +1,38 @@
+# Type check, tests and build for every push and pull request to the public repository.
+# The private development repository carries this file too (it is where the code is written),
+# so every job is fenced to the public one: there it never runs, and costs no Actions minutes.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: github.repository == 'SylvainAtelier/dsh-agent-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Test
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
+          pnpm test
+      - run: pnpm build

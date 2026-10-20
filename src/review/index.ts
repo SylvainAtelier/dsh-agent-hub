@@ -995,7 +995,9 @@ export class ReviewService {
     // what waits to be sent, then what was sent (我的 keeps its own order); newest first within.
     const lead = (item: ReviewItem): boolean => item.requested || item.picked === true
     items.sort((a, b) => (all && lead(a) !== lead(b) ? (lead(a) ? -1 : 1) : 0)
-      || (ownScope ? 0 : reviewRank(a) - reviewRank(b)) || b.updatedAt - a.updatedAt)
+      || (ownScope ? 0 : reviewRank(a) - reviewRank(b)) || b.updatedAt - a.updatedAt
+      // Ties fall to the newer pull request: the parallel lookups above finish in any order.
+      || b.number - a.number || a.key.localeCompare(b.key))
     if (othersList !== undefined) this.allCount = items.length
     // The stacks: each listed pull request's parent, and those stacked with it that the list leaves out.
     const stackedList = this.stackedPulls(scope, onHand, all && othersList?.value.error === undefined)

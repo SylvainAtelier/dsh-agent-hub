@@ -35,19 +35,27 @@ test('prompt: the canvas guide follows the instructions, names the folder, and c
   assert.ok(both.includes('/home/me/.dsh/canvases/<short-kebab-name>.html'))
   assert.ok(!both.includes('canvases//'))
   assert.ok(instructionsText({}, dir)!.startsWith('# Canvases'))
+  assert.ok(instructionsText({}, dir)!.includes('keep everything a canvas shows inside its one file'))
   assert.ok(instructionsText({}, 'C:\\Users\\me\\.dsh\\canvases\\')!.includes('(C:/Users/me/.dsh/canvases/<short-kebab-name>.html)'))
   assert.equal(instructionsText({ canvas: false }, dir), undefined)
   assert.equal(instructionsText({ instructions: 'x', canvas: false }, dir), instructionsText({ instructions: 'x' }))
 })
 
-test('prompt: the Archify guide follows the canvas guide only when both are on', () => {
+test('prompt: the Archify guide follows the canvas guide only when both are on and it is installed', () => {
   const dir = 'C:\\Users\\me\\.dsh\\canvases'
-  assert.equal(instructionsText({ archify: false }, dir), instructionsText({}, dir))
-  assert.ok(!instructionsText({}, dir)!.includes('archify'))
-  const text = instructionsText({ archify: true }, dir)!
+  const skill = 'C:\\Users\\me\\.dsh\\dsh-agent-hub\\archify\\3.2.0\\'
+  assert.equal(instructionsText({ archify: false }, dir, skill), instructionsText({}, dir))
+  assert.ok(!instructionsText({}, dir, skill)!.includes('Archify'))
+  // Switched on but not installed (yet, or the download failed): nothing the models could not follow.
+  assert.equal(instructionsText({ archify: true }, dir), instructionsText({}, dir))
+  const text = instructionsText({ archify: true }, dir, skill)!
   assert.ok(text.startsWith(instructionsText({}, dir)! + '\n\n'))
-  assert.ok(text.includes('`archify` skill'))
+  assert.ok(text.includes('read `C:/Users/me/.dsh/dsh-agent-hub/archify/3.2.0/SKILL.md`'))
+  assert.ok(text.includes('`node C:/Users/me/.dsh/dsh-agent-hub/archify/3.2.0/bin/archify.mjs`'))
   assert.ok(text.includes('`C:/Users/me/.dsh/canvases/<short-kebab-name>.html` as the output path'))
-  assert.equal(instructionsText({ canvas: false, archify: true }, dir), undefined)
-  assert.equal(instructionsText({ archify: true }), undefined)
+  // Several diagrams make one canvas: the panel's sandboxed blob frame cannot follow links between files.
+  assert.ok(text.includes('deliver one canvas'))
+  assert.ok(text.includes('never link the pages to each other'))
+  assert.equal(instructionsText({ canvas: false, archify: true }, dir, skill), undefined)
+  assert.equal(instructionsText({ archify: true }, undefined, skill), undefined)
 })

@@ -35,7 +35,7 @@ The table below lists the options by module (configuration is stored where it wa
 | | Codex | On | The Codex models setting and the Codex card in Plan usage; needs the separate `dsh-codex-subscription` plugin; synced |
 | Conversations | Instructions (Markdown) | Blank | Injected into every conversation with any model: DSH models get it at the end of the system prompt, Claude Agent appends it to Claude Code's system prompt, and bots get it too, after their persona. Blank injects nothing. Claude Agent sessions resume into a fresh process on their next turn to pick up the change |
 | | Canvases | On | Have every model deliver standalone charts, tables and dashboards as interactive, self-contained HTML files in `~/.dsh/canvases`, linked in its reply and browsed together in the Canvases panel on the left |
-| | Archify diagrams | On | With canvases on, have the models draw architecture, workflow, sequence, data-flow, state, ERD and similar diagrams with the [Archify](https://github.com/tt-a1i/archify) skill, still saved as canvases. Install Archify into each model's skills folder yourself; it needs Node and a local Chrome or Edge, and is slower and costlier than a hand-written canvas |
+| | Archify diagrams | Off | With canvases on, turning it on downloads a pinned [Archify](https://github.com/tt-a1i/archify) release (checked by its SHA-256, installed in `~/.dsh/dsh-agent-hub/archify/<version>`) and every model draws architecture, workflow, sequence, data-flow, state, ERD and similar diagrams with it, still saved as canvases; the settings show the install state with a retry, and until it is installed canvases stay hand-written. It needs Node and a local Chrome or Edge, and is slower and costlier than a hand-written canvas |
 | | Selection discussions | On | Selecting chat text or a code block shows "Ask about this"; the temporary discussion runs no tools and does not read the whole main session |
 | | Discussion model | Automatic | Reuses the background helper model route, or a chosen plain text model; Claude Agent, Cursor and Bots are not supported. Changes affect new discussions only |
 | Connectors | Connected services | Blank | Remote MCP servers (Linear, Notion, Sentry, GitHub or any URL); connect once and every model can use them. See [Module: Connectors](#module-connectors) |
@@ -90,7 +90,7 @@ Changes save automatically: switches, model choices and resets save at once; typ
         ## Communication
         - Answer in English; keep code and identifiers as they are
       canvas: true                  # Canvases: charts, tables and dashboards as HTML in ~/.dsh/canvases
-      archify: true                 # Draw diagrams with the Archify skill (needs canvases on)
+      archify: false                # Install Archify and draw diagrams with it (needs canvases on)
     connectors:
       servers:                      # Only the id and URL; sign-ins live in DSH's credential store
         - id: linear
@@ -630,12 +630,26 @@ Run `pnpm test:discussion-ui` for an offline interactive Chrome test that calls 
 
 ## Installation
 
+In DSH's sidebar, open **Plugins → Install** and enter `@sylvainatelier/dsh-agent-hub`. From a terminal (the profile of DSH Desktop is `desktop`):
+
 ```sh
-pnpm install && pnpm build
+dsh plugin --profile desktop add @sylvainatelier/dsh-agent-hub
+```
+
+Restart DSH if asked, then turn on the modules you want under **Settings → Agent Hub → Modules**. Later versions show up under **Settings → Sync & updates**. Each [GitHub release](https://github.com/SylvainAtelier/dsh-agent-hub/releases) carries the same package as a `.tgz` with its SHA-256, for offline installs (`dsh plugin --profile desktop add ./sylvainatelier-dsh-agent-hub-<version>.tgz`).
+
+The package ships the native helper (`dsh-type`) for macOS (Apple silicon and Intel) and Windows (x64 and ARM64), which the clipboard window and Cardputer dictation use. On macOS it asks once for Accessibility permission to type into other apps.
+
+From source (needs Node 22.19+ and pnpm; `pnpm build:native` needs Rust and builds the helper for this computer only):
+
+```sh
+pnpm install && pnpm build && pnpm build:native
 dsh plugin --profile desktop add link:<path to this repository>
 ```
 
-Restart DSH after installing, then open **Settings → Plan usage**.
+## Releasing
+
+Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml) on the public repository only: a `v<version>` tag type-checks and tests the code, builds the native helper on macOS and Windows runners, publishes the package to npm with provenance, and creates the GitHub release with the same `.tgz`. A version with a pre-release suffix (`0.2.0-beta.1`) goes to npm's `next` tag and is marked a pre-release. To release, bump `version` in `package.json` and push the tag `v<version>` to the public repository; maintainers working from a private clone use `npm run release:public` ([`scripts/publish.mjs`](scripts/publish.mjs)), which publishes the snapshot and pushes the tag to the public remote only.
 
 ## Development
 

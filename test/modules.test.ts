@@ -21,11 +21,11 @@ const manager = (bundles: Array<{ name: string; installed: boolean; enabled: boo
   }
 }
 
-test('modules: optional modules start off, Codex on, and canvases draw Archify diagrams', () => {
+test('modules: optional modules start off, Codex on, canvases on and Archify (a download) opt-in', () => {
   const config = Config({} as never)
   assert.deepEqual(config.modules.get(), { reader: false, relay: false, palette: false, device: false, codex: true })
   assert.equal(config.prompt.get().canvas, true)
-  assert.equal(config.prompt.get().archify, true)
+  assert.equal(config.prompt.get().archify, false)
 })
 
 test('modules: the Codex plugin is missing, off or on; a manager that cannot tell asks for nothing', async () => {

@@ -17,7 +17,7 @@ export interface PromptSettings {
   instructions?: string
   /** Teach the models to deliver visual results as canvases (canvas/index.ts); on unless false. */
   canvas?: boolean
-  /** With canvases on: have the models draw structural diagrams with the Archify skill, when they have it; off unless true. */
+  /** With canvases on: the plugin installs the Archify skill (archify.ts) and the models draw structural diagrams with it; off unless true. */
   archify?: boolean
   /** Built-in rule ids of the find scans refused for every model (guard.ts). */
   blockedScans: readonly string[]
@@ -36,23 +36,24 @@ function canvasText(dir: string): string {
 
 When the user wants a standalone analytical or visual result (charts, comparison tables, timelines, dashboards, data or architecture explorations: anything better seen than read), build it as a canvas rather than a Markdown table or a wall of text. Do not use one for ordinary answers, code changes, drafts, or when the user asked for a deliverable in a specific tool.
 
-A canvas is one self-contained HTML file: all CSS, JavaScript and data inline, with no build step and no external scripts, fonts, images or network requests, so it opens anywhere and can be shared as it is. Make it interactive wherever that helps the reader (sorting, filtering, search, tooltips, tabs, toggles, drill-down), in plain JavaScript with hand-drawn SVG or canvas charts. Follow \`prefers-color-scheme\` for light and dark, keep it responsive, and give it a meaningful \`<title>\`.
+A canvas is one self-contained HTML file: all CSS, JavaScript and data inline, with no build step and no external scripts, fonts, images or network requests, so it opens anywhere and can be shared as it is. Make it interactive wherever that helps the reader (sorting, filtering, search, tooltips, tabs, toggles, drill-down), in plain JavaScript with hand-drawn SVG or canvas charts. Follow \`prefers-color-scheme\` for light and dark, keep it responsive, and give it a meaningful \`<title>\`. The panel runs a canvas in a sandboxed frame from a \`blob:\` address, where links and references to other local files (another canvas included) resolve to nothing and open a blank page: keep everything a canvas shows inside its one file, and move between its parts with tabs or in-page anchors.
 
 Write it to \`${dir}/<short-kebab-name>.html\` (create the folder if needed; to revise an earlier canvas, rewrite that file instead of adding a copy). Then link it in your reply with its absolute path, as a Markdown link with forward slashes, such as [Title](${dir}/<short-kebab-name>.html) (a backslash in a Markdown link is an escape and breaks the path): clicking it opens the canvas beside the chat. If you have a \`present\` tool, also present the file. All canvases are browsed together in the ${localized({ zh: '画布', en: 'Canvases' })} panel.`
 }
 
-/** Structural diagrams through the Archify skill (github.com/tt-a1i/archify), still delivered as canvases in `dir`. */
-function archifyText(dir: string): string {
-  return `For a diagram of a system's architecture, a workflow, a sequence of calls, a data flow, a state lifecycle, a database schema (ERD), classes, a tree, a timeline or a waterfall of timings, use the \`archify\` skill if you have it, in its native diagram mode: give its \`finalize\` command \`${dir}/<short-kebab-name>.html\` as the output path (\`meta.output\` stays the relative path its contract requires) and its own working folder as \`--out-dir\`, so only the page and its \`.delivery.json\` land in the canvases folder, then link the page as above. Without the skill, and for every other result, write the canvas yourself; do not use Archify's explainer pages or change your rules file for its explainer modes.`
+/** Structural diagrams through the Archify skill (github.com/tt-a1i/archify) installed in `skill`, still delivered as canvases in `dir`. */
+function archifyText(dir: string, skill: string): string {
+  return `For a diagram of a system's architecture, a workflow, a sequence of calls, a data flow, a state lifecycle, a database schema (ERD), classes, a tree, a timeline or a waterfall of timings, use Archify, installed at \`${skill}\`: read \`${skill}/SKILL.md\` and follow its native diagram mode, running its CLI as \`node ${skill}/bin/archify.mjs\`. Give its \`finalize\` command \`${dir}/<short-kebab-name>.html\` as the output path (\`meta.output\` stays the relative path its contract requires) and its own working folder as \`--out-dir\`, so only the page and its \`.delivery.json\` land in the canvases folder, then link the page as above. When the result needs several diagrams, or a diagram together with other content, deliver one canvas: finalize each diagram into Archify's working folder instead, and embed its page in your canvas as a gzip-compressed base64 string, unpacked on demand (\`DecompressionStream('gzip')\`) into an iframe's \`srcdoc\` with \`data-embed="true"\` set on its \`<html>\`, one diagram shown at a time behind tabs; never link the pages to each other. If Node or its browser check is unavailable, say so and write the canvas yourself. For every other result, write the canvas yourself; do not use Archify's explainer pages or change your rules file for its explainer modes. Agent Hub manages Archify's version: leave out its update notices and never install or update it.`
 }
 
-/** The text to inject (the user's instructions, then the canvas guide), or undefined when there is nothing to inject. */
-export function instructionsText(settings: Pick<PromptSettings, 'instructions' | 'canvas' | 'archify'> | undefined, canvasDir?: string): string | undefined {
+/** The text to inject (the user's instructions, then the canvas guide), or undefined when there is nothing to inject. `archifyDir`: the installed Archify skill, once ready. */
+export function instructionsText(settings: Pick<PromptSettings, 'instructions' | 'canvas' | 'archify'> | undefined, canvasDir?: string, archifyDir?: string): string | undefined {
   const body = settings?.instructions?.trim() ?? ''
   // Forward slashes even on Windows: Markdown eats a backslash before punctuation (`\.dsh` → `.dsh`).
-  const dir = canvasDir === undefined || settings?.canvas === false ? undefined : canvasDir.replace(/\\/g, '/').replace(/\/+$/, '')
+  const slashed = (path: string): string => path.replace(/\\/g, '/').replace(/\/+$/, '')
+  const dir = canvasDir === undefined || settings?.canvas === false ? undefined : slashed(canvasDir)
   const canvas = dir === undefined ? '' : canvasText(dir)
-  const archify = dir !== undefined && settings?.archify === true ? archifyText(dir) : ''
+  const archify = dir !== undefined && settings?.archify === true && archifyDir !== undefined ? archifyText(dir, slashed(archifyDir)) : ''
   const parts = [body === '' ? '' : `${HEADING}\n\n${body}`, canvas, archify].filter((part) => part !== '')
   return parts.length === 0 ? undefined : parts.join('\n\n')
 }

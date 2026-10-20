@@ -34,7 +34,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { hostname } from 'node:os'
-import { basename } from 'node:path'
+import { win32 } from 'node:path'
 import { killTree } from '../exec.ts'
 import { clearWorkers, INSTALL_HINT, type Cleared } from './cli.ts'
 import type { Probe, ProcSample } from './probe.ts'
@@ -106,7 +106,7 @@ const BULLET = /^·\s+https?:\/\/\S+\/session\/(qs_[A-Za-z0-9]+)/
 /** A tool call on one line: `Edit: README.md`, `Bash: npm test`. */
 export function toolOf(name: string, input: Record<string, unknown> | undefined): string {
   const path = input?.file_path ?? input?.path ?? input?.notebook_path
-  const detail = typeof path === 'string' ? basename(path)
+  const detail = typeof path === 'string' ? win32.basename(path)
     : typeof input?.command === 'string' ? input.command
       : typeof input?.pattern === 'string' ? input.pattern
         : typeof input?.description === 'string' ? input.description : ''
@@ -406,7 +406,8 @@ function isAlive(pid: number): boolean {
 export function daemonName(path: string, host = hostname()): string {
   const ascii = (text: string): string => text.replace(/[^\x20-\x7e]/g, '').trim()
   const machine = ascii(host.replace(/\.local$/i, '')) || 'DSH'
-  const folder = ascii(basename(path))
+  // win32's basename splits on both separators, whichever system named the path.
+  const folder = ascii(win32.basename(path))
   return folder === '' ? machine : `${machine} / ${folder}`
 }
 

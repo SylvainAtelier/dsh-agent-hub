@@ -1,5 +1,5 @@
 {
-  "name": "dsh-agent-hub",
+  "name": "@sylvainatelier/dsh-agent-hub",
   "version": "0.1.0",
   "description": "DeepSeek Harness plugin integrating multiple agents (Claude, Codex, MiniMax, ...): subscription usage today, multi-agent task coordination next",
   "type": "module",
@@ -36,10 +36,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lencshu/dsh-agent-hub.git"
+    "url": "git+https://github.com/SylvainAtelier/dsh-agent-hub.git"
   },
-  "homepage": "https://github.com/lencshu/dsh-agent-hub#readme",
-  "bugs": "https://github.com/lencshu/dsh-agent-hub/issues",
+  "homepage": "https://github.com/SylvainAtelier/dsh-agent-hub#readme",
+  "bugs": "https://github.com/SylvainAtelier/dsh-agent-hub/issues",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -126,7 +130,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-test-module-mocks test/*.test.ts",
     "test:discussion-ui": "node scripts/check-discussion-ui.mjs",
-    "publish:public": "node scripts/publish.mjs"
+    "publish:public": "node scripts/publish.mjs",
+    "release:public": "node scripts/publish.mjs --release"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.289",

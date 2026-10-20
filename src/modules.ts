@@ -11,6 +11,8 @@
  * or enable it, through DSH's plugin manager.
  */
 
+import type { ArchifyStatus } from './archify.ts'
+
 /** The browser's method for the switches and the Codex plugin's state. */
 export const MODULES_METHOD = 'agent-hub/modules'
 
@@ -26,9 +28,12 @@ export type CodexPlugin = 'missing' | 'off' | 'on'
 export interface ModulesStatus {
   modules: ModulesSettings
   codex: CodexPlugin
+  /** The Archify skill the plugin installs for 设置 → Agent Hub → Archify 结构图 (archify.ts). */
+  archify?: ArchifyStatus
 }
 
-export type ModulesRequest = { op?: 'status' } | { op: 'codex'; action: 'install' | 'enable' }
+/** `archify`: install the Archify skill again after a failure. */
+export type ModulesRequest = { op?: 'status' } | { op: 'codex'; action: 'install' | 'enable' } | { op: 'archify' }
 
 export interface CodexSetup {
   codex: CodexPlugin

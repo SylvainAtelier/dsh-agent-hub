@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -404,7 +405,8 @@ test('bridge: holds follow a hand-off\'s caller folder until released', () => {
 })
 
 test('bridge server: refuses without the token, from a page, or under another Host; answers the dsh script end to end', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh-bridge-'))
+  // Its real path: the script's working folder reads /private/var/… for macOS's /var/… temp folder.
+  const dir = realpathSync(await mkdtemp(join(tmpdir(), 'dsh-bridge-')))
   const asks = approvalsFixture()
   const { bridge, answer, sent } = fixture({ workspaces: () => [{ id: 'w', path: dir, title: 'scratch' }], approvals: asks.approvals })
   const server = await startBridgeServer(bridge, join(dir, BRIDGE_FILE), () => {})

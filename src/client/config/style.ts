@@ -196,6 +196,10 @@ p.ac-transfer-panel { display: block; }
 .ac-sync-bar-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; font-size: var(--ac-fs-body); line-height: 18px; }
 .ac-sync-state { display: inline-flex; align-items: center; gap: 4px; font-size: var(--ac-fs-label); line-height: 20px; font-weight: 600; }
 .ac-sync-state[data-tone="ok"] { color: var(--ah-ok-ink); }
+.ac-archify { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin:6px 0 0; font-size:var(--ac-fs-body); color:var(--ah-info-ink); }
+.ac-archify[data-tone="ok"] { color:var(--ah-ok-ink); }
+.ac-archify[data-tone="warn"] { color:var(--ah-warn-ink); }
+.ac-archify[data-tone="error"] { color:var(--ah-danger-ink); }
 .ac-sync-state[data-tone="attention"] { color: var(--ah-warn-ink); }
 .ac-sync-fetch { flex: none; gap: 6px; white-space: nowrap; }
 .ac-sync-counts { font-family: var(--ah-mono); font-size: var(--ac-fs-body); font-variant-numeric: tabular-nums; color: var(--ah-fg2); }

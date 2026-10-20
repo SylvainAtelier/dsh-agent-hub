@@ -29,6 +29,7 @@ import type { AutomationStore } from '../automation/api.ts'
 import { FONTS } from '../../appearance.ts'
 import { InterfaceScaleField } from './scale.tsx'
 import { DevicePanel } from './device.tsx'
+import { ArchifyNote } from './archify.tsx'
 import { HotkeyField } from './palette.tsx'
 import type { PaletteStore } from '../palette/api.ts'
 import type { CardputerStore } from '../device/api.ts'
@@ -221,7 +222,10 @@ export function ConfigSection(props: {
                   if (spec.kind === 'hotkey') return <HotkeyField key={id} id={id} field={field} disabled={disabled} form={form} {...(props.palette === undefined ? {} : { store: props.palette })} />
                   if (spec.kind === 'uiScale') return <InterfaceScaleField key={id} fields={state.fields} disabled={disabled} form={form} />
                   if (spec.kind === 'bot') return <BotField key={id} id={id} field={field} disabled={disabled} form={form} bots={botIds(state.fields['team.agents']?.value)} optional={spec.optional} />
-                  return <Field key={id} spec={spec} fields={state.fields} disabled={disabled} form={form} models={models} />
+                  const note = id === 'prompt.archify' && props.modules !== undefined
+                    ? <ArchifyNote store={props.modules} on={field.value === true} disabled={disabled} />
+                    : undefined
+                  return <Field key={id} spec={spec} fields={state.fields} disabled={disabled} form={form} models={models} note={note} />
                 })}
                 {section === 'models' && props.shortcuts !== undefined && <ShortcutRows shortcuts={props.shortcuts} />}
               </Group>
@@ -303,7 +307,7 @@ function shown(spec: FieldSpec, value: unknown): string {
   return value === undefined || value === '' ? t('empty') : String(value)
 }
 
-export function Field(props: { spec: FieldSpec; fields: FormState['fields']; disabled: boolean; form: ConfigFormModel; models: ModelDirectory }): ReactNode {
+export function Field(props: { spec: FieldSpec; fields: FormState['fields']; disabled: boolean; form: ConfigFormModel; models: ModelDirectory; note?: ReactNode }): ReactNode {
   const { spec, fields, disabled, form } = props
   const id = fieldId(spec)
   const state: FieldState = fields[id]!
@@ -388,6 +392,7 @@ export function Field(props: { spec: FieldSpec; fields: FormState['fields']; dis
             ? t(spec.kind === 'integer' ? 'invalidInteger' : 'invalidNumber', { min: spec.min ?? '', max: spec.max ?? '' })
             : hint}
         </p>
+        {props.note}
       </div>
       <div className="ac-control">{control}</div>
     </div>

@@ -10,8 +10,10 @@ import type { GitStatus } from '../src/git/types.ts'
 
 // Keep native notifications deterministic while exercising real Git ignore/index semantics.
 const listeners = new Map<string, (event: string, name: string | null) => void>()
+// Without the namespace's `default`: Node 24 refuses to define its properties (constants) a second time.
+const { default: _default, ...named } = fs as typeof fs & { default?: unknown }
 mock.module('node:fs', { namedExports: {
-  ...fs,
+  ...named,
   watch(root: string, _options: unknown, listener: (event: string, name: string | null) => void) {
     listeners.set(root, listener)
     return Object.assign(new EventEmitter(), { close() { listeners.delete(root) } })

@@ -17,6 +17,8 @@ export interface ModulesSnapshot {
   codexBusy: boolean
   codexError?: string
   codexRestart?: boolean
+  /** A retry of the Archify install running. */
+  archifyBusy?: boolean
 }
 
 function remembered(): ModulesStatus | undefined {
@@ -87,6 +89,19 @@ export class ModulesStore {
       this.set({ codexError: error instanceof Error ? error.message : String(error) })
     } finally {
       this.set({ codexBusy: false })
+    }
+  }
+
+  /** Install the Archify skill again after a failure. */
+  retryArchify = async (): Promise<void> => {
+    if (this.snapshot.archifyBusy === true) return
+    this.set({ archifyBusy: true })
+    try {
+      this.set({ status: await rpcValue<ModulesStatus>(this.rpc, MODULES_METHOD, { op: 'archify' }, 'agent-hub modules RPC failed') })
+    } catch {
+      await this.refresh()
+    } finally {
+      this.set({ archifyBusy: false })
     }
   }
 

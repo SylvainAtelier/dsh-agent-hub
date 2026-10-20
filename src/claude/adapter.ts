@@ -70,6 +70,8 @@ export interface AdapterHost {
   trusted?(tool: string, input: Record<string, unknown>, sessionId: string, cwd: string): boolean
   /** Where an @session snapshot too large for the prompt is saved; Claude Code may read that folder. */
   references?: ReferenceSpill
+  /** More folders Claude Code may read (the installed Archify skill). */
+  directories?(): readonly string[]
 }
 
 /** The plugin's Claude settings (`Config.claude` in index.ts). */
@@ -289,6 +291,7 @@ export class ClaudeAgentAdapter extends LlmAdapter {
       // A forked DSH session carries its parent's Claude Code session; never drive one session from two places.
       const taken = resume !== undefined && [...this.conversations.entries()].some(([other, live]) => other !== key && !live.closed && live.session === resume)
       const served = bridge?.open()
+      const readable = [...(this.host.references === undefined ? [] : [this.host.references.dir]), ...(this.host.directories?.() ?? [])]
       conversation = new Conversation({
         executable: executable(),
         cwd,
@@ -300,7 +303,7 @@ export class ClaudeAgentAdapter extends LlmAdapter {
         ...(resume === undefined ? {} : { resume, fork: taken }),
         ...(served === undefined ? {} : { mcpServers: served.servers, trusted: served.trusted, bridged: bridge!.signature }),
         ...(bridge?.team === true ? { disallowedTools: NATIVE_TEAM_TOOLS } : {}),
-        ...(this.host.references === undefined ? {} : { additionalDirectories: [this.host.references.dir] }),
+        ...(readable.length === 0 ? {} : { additionalDirectories: readable }),
         approve: (agent, toolName, input, context) => this.host.trusted?.(toolName, input, key, cwd) === true
           ? Promise.resolve({ behavior: 'allow', updatedInput: input })
           : this.approve(agent, toolName, input, context),

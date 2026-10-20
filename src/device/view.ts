@@ -7,7 +7,8 @@
  * sessions read RUNNING between turn start and end rather than TOOL.
  */
 
-import { basename } from 'node:path'
+// win32's basename splits on both separators: a session's folder reads the same from any system.
+import { win32 } from 'node:path'
 import type { AgentRow, AgentState } from './types.ts'
 
 export interface SessionEvent {
@@ -101,7 +102,7 @@ export class Sessions {
       .map((track) => ({
         id: track.id,
         agent: clip((track.provider === undefined ? undefined : this.providerName(track.provider)) ?? track.provider ?? 'DSH', 24),
-        ws: clip(basename(track.cwd) || track.cwd, 24),
+        ws: clip(win32.basename(track.cwd) || track.cwd, 24),
         state: track.state,
         ...(track.tool === undefined ? {} : { tool: clip(track.tool, 32) }),
         task: clip(track.todo ?? track.title),

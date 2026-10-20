@@ -3,4 +3,4 @@
 # (settings section + sidebar glance card, served from lib/client.js).
 - insert:
     - id: agent-hub
-      name: 'dsh-agent-hub'
+      name: '@sylvainatelier/dsh-agent-hub'

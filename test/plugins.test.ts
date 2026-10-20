@@ -373,13 +373,13 @@ test("Client store unwraps native transport envelope and reports failures", asyn
 });
 
 test("This plugin is upgraded too, last in its batch", async () => {
-  const { service, calls } = fixture([row("dsh-agent-hub"), row("plugin-a")]);
+  const { service, calls } = fixture([row("@sylvainatelier/dsh-agent-hub"), row("plugin-a")]);
   await service.check();
-  service.upgrade(["dsh-agent-hub", "plugin-a"]);
+  service.upgrade(["@sylvainatelier/dsh-agent-hub", "plugin-a"]);
   await settled(service);
   assert.deepEqual(
     calls.map((call) => call.spec),
-    ["plugin-a@2.0.0", "dsh-agent-hub@2.0.0"],
+    ["plugin-a@2.0.0", "@sylvainatelier/dsh-agent-hub@2.0.0"],
   );
 });
 
